@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Todo App</title>
+  <style>
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      margin: 40px;
+      background: #f4f6f8;
+      color: #333;
+    }
+
+    h1 {
+      text-align: center;
+      color: #2c3e50;
+    }
+
+    .input-area {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    input {
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      width: 200px;
+      font-size: 14px;
+      transition: 0.3s;
+    }
+
+    input:focus {
+      border-color: #3498db;
+      outline: none;
+      box-shadow: 0 0 5px rgba(52, 152, 219, 0.3);
+    }
+
+    button {
+      padding: 10px 14px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: 0.3s;
+    }
+
+    button:hover {
+      opacity: 0.85;
+      transform: translateY(-2px);
+    }
+
+    .btn-add { background: #27ae60; color: white; }
+    .btn-all { background: #3498db; color: white; }
+    .btn-uncompleted { background: #e67e22; color: white; }
+
+    h2 {
+      margin-top: 30px;
+      color: #2c3e50;
+    }
+
+    #tasks {
+      display: grid;
+      gap: 12px;
+      margin-top: 15px;
+    }
+
+    .task {
+      background: white;
+      padding: 15px;
+      border-radius: 12px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: 0.3s;
+    }
+
+    .task:hover {
+      transform: scale(1.02);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .done {
+      text-decoration: line-through;
+      color: gray;
+      opacity: 0.7;
+    }
+
+    .task b {
+      color: #2c3e50;
+    }
+
+    .task-buttons button {
+      margin-left: 6px;
+      font-size: 13px;
+    }
+
+    .btn-done { background: #2ecc71; color: white; }
+    .btn-delete { background: #e74c3c; color: white; }
+  </style>
+</head>
+<body>
+  <h1>✅ CRUD</h1>
+
+  <div class="input-area">
+    <input id="taskTitle" placeholder="Task nomi..." />
+    <input id="taskDesc" placeholder="Task tavsifi..." />
+    <button class="btn-add" onclick="addTask()">➕ Qo‘shish</button>
+    <button class="btn-all" onclick="getTasks()">📋 Barchasi</button>
+    <button class="btn-uncompleted" onclick="getUncompleted()">⭕ Bajarilmagan</button>
+  </div>
+
+  <h2>Tasks:</h2>
+  <div id="tasks"></div>
+
+  <script>
+    const API_URL = "http://localhost:9091";
+
+    async function addTask() {
+      const title = document.getElementById("taskTitle").value;
+      const desc = document.getElementById("taskDesc").value;
+
+      const res = await fetch(`${API_URL}/tasks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: title, description: desc })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        alert("Xatolik: " + err.message);
+        return;
+      }
+
+      document.getElementById("taskTitle").value = "";
+      document.getElementById("taskDesc").value = "";
+      getTasks();   
+    }
+
+    async function getTasks() {
+      const res = await fetch(`${API_URL}/tasks`);
+      if (!res.ok) {
+        const err = await res.json();
+        alert("Xatolik: " + err.message);
+        return;
+      }
+      const data = await res.json();
+      const tasks = Array.isArray(data) ? data : Object.values(data);
+      renderTasks(tasks);
+    }
+
+    async function getUncompleted() {
+      const res = await fetch(`${API_URL}/tasks?completed=true`);
+      const data = await res.json(); 
+
+      if (!res.ok) {
+        alert("Xatolik: " + data.message);
+        return;
+      }
+      const tasks = Array.isArray(data) ? data : Object.values(data);
+      renderTasks(tasks);
+      window.history.pushState({}, "", "index.html?completed=true");
+    }
+
+    async function completeTask(title) {
+      const res = await fetch(`${API_URL}/tasks/${title}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ complete: true })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        alert("Xatolik: " + err.message);
+        return;
+      }
+      getTasks();
+    }
+
+    async function deleteTask(title) {
+      try {
+        const url = `${API_URL}/tasks/${encodeURIComponent(title)}`;
+        const res = await fetch(url, { method: "DELETE" });
+
+        if (!res.ok) {  
+          const txt = await res.text().catch(()=>`status ${res.status}`);
+          alert(`O'chirish muvaffaqiyatsiz: ${res.status} — ${txt}`);
+          return;
+        }
+        getTasks();
+      } catch (err) {
+        console.error("Delete request error:", err);
+        alert("Tarmoq xatosi: " + err.message);
+      }
+    }
+
+    function renderTasks(tasks) {
+      const container = document.getElementById("tasks");
+      container.innerHTML = "";
+
+      tasks.forEach(t => {
+        const div = document.createElement("div");
+        div.className = "task " + (t.Completed ? "done" : "");
+        div.innerHTML = `
+          <div>
+            <b>${t.Title}</b>: ${t.Description}
+          </div>
+          <div class="task-buttons">
+            <button class="btn-done" onclick="completeTask('${t.Title}')">✅ Done</button>
+            <button class="btn-delete" onclick="deleteTask('${t.Title}')">❌ O‘chirish</button>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    getTasks();
+  </script>
+</body>
+</html>
